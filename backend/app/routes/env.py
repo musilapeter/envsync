@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.app.auth import CurrentUser, get_current_user
@@ -67,4 +67,29 @@ async def pull_env(
         "version": latest["version"],
         "pushed_by": latest["pushed_by"],
         "pushed_at": latest["pushed_at"],
+    }
+
+
+@router.get("/{project_id}/{branch}/diff")
+async def get_drift(
+    project_id: str,
+    branch: str,
+    local_keys: list[str] = Query(default_factory=list),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return keys missing locally vs. on the server."""
+    latest = await db.env_versions.find_one(
+        {"project_id": project_id, "branch": branch},
+        sort=[("version", -1)],
+    )
+    if not latest:
+        raise HTTPException(status_code=404, detail="No env found for this branch")
+
+    server_keys = set(latest["key_names"])
+    local_keys_set = set(local_keys)
+
+    return {
+        "missing_locally": sorted(server_keys - local_keys_set),
+        "extra_locally": sorted(local_keys_set - server_keys),
+        "in_sync": server_keys == local_keys_set,
     }
