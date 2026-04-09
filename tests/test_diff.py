@@ -28,7 +28,12 @@ def writer_user() -> CurrentUser:
 
 @pytest.fixture
 def reader_user() -> CurrentUser:
-    return CurrentUser(email="reader@example.com", writable_projects=set())
+    from backend.app.auth import UserRole
+    return CurrentUser(
+        email="reader@example.com",
+        role=UserRole.READONLY,
+        project_ids={"project-123"},
+    )
 
 
 def test_drift_endpoint_compares_local_and_server_keys(writer_user: CurrentUser, reader_user: CurrentUser):

@@ -69,18 +69,36 @@ pytest
 4. Start the API server.
 
 ```powershell
+$env:ENVSYNC_JWT_SECRET = "test-secret-key-32-chars-minimum"
+$env:ENVSYNC_JWT_ALGORITHM = "HS256"
 uvicorn backend.app.main:app --reload
 ```
 
-5. In a second terminal, set the CLI runtime variables.
+5. In a second terminal, generate a test JWT token.
+
+```powershell
+python -c "
+import jwt
+token = jwt.encode({
+    'email': 'dev@example.com',
+    'role': 'owner',
+    'project_ids': ['project-123']
+}, 'test-secret-key-32-chars-minimum', algorithm='HS256')
+Write-Host 'Token:' $token
+"
+```
+
+Copy the token output (without "Token:" prefix).
+
+6. Set CLI environment variables.
 
 ```powershell
 $env:ENVSYNC_API = "http://127.0.0.1:8000"
-$env:ENVSYNC_TOKEN = "your-jwt-token"
+$env:ENVSYNC_TOKEN = "your-token-from-step-5"
 $env:ENVSYNC_PASS = "your-local-passphrase"
 ```
 
-6. Add a project file in the repository root.
+7. Add a project file in the repository root.
 
 Create a `.envsync.json` file that contains your project identifier.
 
@@ -90,32 +108,85 @@ Create a `.envsync.json` file that contains your project identifier.
 }
 ```
 
-7. Prepare a local `.env` file.
+8. Prepare a local `.env` file.
 
 ```env
 API_KEY=secret
 DEBUG=true
 ```
 
-8. Push the encrypted env file.
+9. Push the encrypted env file.
 
 ```powershell
 envsync push --branch main
 ```
 
-9. Pull the latest encrypted env file back down.
+10. Pull the latest encrypted env file back down.
 
 ```powershell
 envsync pull --branch main
 ```
 
-10. Check drift between local keys and the server.
+11. Check drift between local keys and the server.
 
 ```powershell
 envsync diff --branch main
 ```
 
-## CLI Commands
+## JWT Authentication
+
+EnvSync uses JWT bearer tokens for all API requests. Set these environment variables before starting the server:
+
+```powershell
+$env:ENVSYNC_JWT_SECRET = "your-secret-key-min-32-chars"
+$env:ENVSYNC_JWT_ALGORITHM = "HS256"
+```
+
+If not set, development defaults are used (not secure for production).
+
+### Token Format
+
+A valid token contains these claims:
+
+```json
+{
+  "email": "dev@example.com",
+  "role": "owner|developer|readonly",
+  "project_ids": ["project-123", "project-456"]
+}
+```
+
+### Generate a Test Token
+
+To generate a token locally for testing, use Python:
+
+```python
+import jwt
+
+payload = {
+    "email": "dev@example.com",
+    "role": "developer",
+    "project_ids": ["project-123"]
+}
+
+token = jwt.encode(payload, "your-secret-key-min-32-chars", algorithm="HS256")
+print(f"Bearer {token}")
+```
+
+Then include the token in your CLI commands:
+
+```powershell
+$env:ENVSYNC_TOKEN = "Bearer eyJhbGc..."
+envsync push --branch main
+```
+
+### Role Permissions
+
+- **owner**: read/write/admin on all projects without requiring a project list.
+- **developer**: read/write on projects in `project_ids`.
+- **readonly**: read-only on projects in `project_ids`.
+
+
 
 ### `envsync push`
 
@@ -181,6 +252,9 @@ Example response:
 
 ## Security Model
 
+- All routes now require a valid JWT token in the `Authorization: Bearer <token>` header.
+- The token contains `email`, `role`, and `project_ids` claims.
+- Access is role-based: `owner` (full access), `developer` (read+write to assigned projects), `readonly` (read-only to assigned projects).
 - The passphrase stays local and should come from the developer's shell or a keyring-backed secret store.
 - The backend stores ciphertext only.
 - The backend stores key names for drift detection, but not values.
@@ -189,7 +263,8 @@ Example response:
 ## Development Notes
 
 - The in-memory database is intentionally minimal for the current phase.
-- JWT auth and RBAC are still stubbed in the codebase and should be replaced before production use.
+- JWT tokens in development use a short secret for simplicity; in production, use a 32+ character secret.
+- You may see `InsecureKeyLengthWarning` from PyJWT during tests with the 11-character test secret; this is expected and safe for development only.
 - The route layer is small by design so later phases can add MongoDB, real auth, and a dashboard without reshaping the current API.
 
 ## Testing
@@ -215,6 +290,4 @@ pytest tests/test_routes.py
 - Treat `key_names` as metadata only.
 - Keep new features behind tests before expanding the architecture.
 
-## Next Steps
 
-The next phase should add real JWT authentication and role-based authorization, then replace the in-memory store with MongoDB.
