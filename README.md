@@ -2,6 +2,8 @@
 
 EnvSync is an encrypted environment vault for teams that want to store, pull, and compare `.env` files without exposing plaintext on the server.
 
+Keep both `.env` and `.envsync.json` local to your machine. They are ignored by Git and should not be pushed to the repository.
+
 The design is intentionally simple in this phase:
 
 - The CLI encrypts `.env` content locally.
@@ -98,9 +100,9 @@ $env:ENVSYNC_TOKEN = "your-token-from-step-5"
 $env:ENVSYNC_PASS = "your-local-passphrase"
 ```
 
-7. Add a project file in the repository root.
+7. Add a local project file in the repository root.
 
-Create a `.envsync.json` file that contains your project identifier.
+Create a `.envsync.json` file that contains your project identifier. Do not commit this file.
 
 ```json
 {
@@ -109,6 +111,8 @@ Create a `.envsync.json` file that contains your project identifier.
 ```
 
 8. Prepare a local `.env` file.
+
+Like `.envsync.json`, this file should stay untracked and remain only on your workstation.
 
 ```env
 API_KEY=secret
