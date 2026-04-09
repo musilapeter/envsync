@@ -53,6 +53,9 @@ async def pull_env(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Fetch the latest encrypted .env snapshot for a branch."""
+    if not user.can_read(project_id):
+        raise HTTPException(status_code=403, detail="No read access to this project")
+
     latest = await db.env_versions.find_one(
         {"project_id": project_id, "branch": branch},
         sort=[("version", -1)],
@@ -78,6 +81,9 @@ async def get_drift(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Return keys missing locally vs. on the server."""
+    if not user.can_read(project_id):
+        raise HTTPException(status_code=403, detail="No read access to this project")
+
     latest = await db.env_versions.find_one(
         {"project_id": project_id, "branch": branch},
         sort=[("version", -1)],
