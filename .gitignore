@@ -1,6 +1,7 @@
-.env
-.env.*
-.envsync.json
+# Local env files
+/.env
+/.env.*
+/.envsync.json
 
 __pycache__/
 *.py[cod]
